@@ -1,0 +1,12 @@
+[Unit]
+Description=Tiny HTTP Process Manager
+After=network.target
+[Service]
+Type=simple
+User=tinyprocessmanager
+WorkingDirectory=/
+ExecStart=/usr/bin/tinyprocessmanager --port 8888
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
