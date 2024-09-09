@@ -14,7 +14,6 @@ Source0:       tiny_process_manager-%{version}-%{release}.tar.gz
 
 Requires:      bash python3
 Requires(pre): /usr/sbin/useradd, /usr/bin/getent
-Buildroot: %{_topdir}/BUILDROOT/
 
 %description
 Tiny Process manager build
