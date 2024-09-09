@@ -3,7 +3,7 @@ Description=Tiny HTTP Process Manager
 After=network.target
 [Service]
 Type=simple
-User=tinyprocessmanager
+User=HGCAL_pro
 WorkingDirectory=/
 ExecStart=/usr/bin/tinyprocessmanager --port 8888
 Restart=on-failure

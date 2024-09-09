@@ -37,7 +37,7 @@ rm -rf $RPM_BUILD_ROOT
 %{_libdir}/systemd/system/tiny_process_manager.service
 
 %pre
-groupadd -f -r -g 889 tinyprocessmanager
-getent user gpio > /dev/null 2>&1 || useradd -c TinyProcessManager-Services -g tinyprocessmanager -r tinyprocessmanager
+groupadd -f -r -g 889 HGCAL_pro
+getent user gpio > /dev/null 2>&1 || useradd -c HGCAL_Production_Servics -g HGCAL_pro -r HGCAL_pro
 exit 0
 
