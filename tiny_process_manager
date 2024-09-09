@@ -1,0 +1,253 @@
+#! /usr/bin/env python3
+"""Provides a simple process manager with a simple  http  GET interface.
+See `--help` for information on the options when running the manager.
+
+The server provides a GET interface with the following endpoints
+
+- /start/{name_of_service}  -- Start a service
+- /services                 -- List available services
+- /stop/{name_of_service}   -- Stop a running services
+- /list                     -- List laumnched services
+- /status/{name_of_service} -- Get information on a running service
+
+
+The services are defined in a configuration json file,
+which contains  a single json dictionary of the form:
+{"service_name" : "command to run"}
+"""
+
+
+import argparse
+import json
+import os
+import shlex
+import subprocess
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from pathlib import Path, PosixPath
+from urllib.parse import parse_qsl, urlparse
+
+
+class Process:
+    def __init__(self, name, command):
+        self.name = name
+        self.command = command
+        self.process = None
+        self.launched = False
+
+    def start(self):
+        if self.running:
+            raise RuntimeError("Cannot start already running process")
+        args = shlex.split(self.command)
+        self.process = subprocess.Popen(args)
+        self.launched = True
+
+    def stop(self):
+        if not self.running:
+            raise RuntimeError("Cannot stop dead process")
+        self.process.kill()
+        self.launched = False
+
+    @property
+    def running(self):
+        if not self.launched:
+            return False
+        else:
+            return self.process.poll() is None
+
+    @property
+    def pid(self):
+        if self.running:
+            return self.process.pid
+        else:
+            return None
+
+
+def protect(func):
+    def inner(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            return {
+                "result": "ERROR",
+                "reason": "Exception thrown",
+                "exception": str(e),
+            }
+
+    return inner
+
+
+class Manager:
+    def __init__(self):
+        self.running = False
+        self.processes = {}
+        self.services = {}
+        self.command_dispatch = {
+            "start": self.start_process,
+            "stop": self.stop_process,
+            "status": self.status,
+            "services": self.list_services,
+            "list": self.list_processes,
+        }
+
+    def start_process(self, name):
+
+        if name not in self.services:
+            return {
+                "result": "ERROR",
+                "reason": f"Unknown service '{name}'",
+            }
+        command = self.services[name]
+        p = Process(name, command)
+        p.start()
+        if name in self.processes and self.processes[name].running:
+            return {
+                "result": "ERROR",
+                "reason": f"Process with name {name} is already running.",
+            }
+
+        if p.running:
+            self.processes[name] = p
+            return {"result": "OK", "pid": p.pid}
+        else:
+            return {
+                "result": "ERROR",
+                "reason": f"Process launched but is not running",
+            }
+
+    def list_processes(self):
+        l = {
+            n: {"pid": p.pid, "is_running": p.running}
+            for n, p in self.processes.items()
+        }
+        return {"result": "OK", "data": l}
+
+    def list_services(self):
+        return {"result": "OK", "data": self.services}
+
+    def stop_process(self, name):
+        if not name in self.processes:
+            return {
+                "result": "ERROR",
+                "reason": f"No process {name}",
+            }
+        p = self.processes[name]
+        if not p.running:
+            return {
+                "result": "ERROR",
+                "reason": f"Process {name} is not currently running",
+            }
+        p.stop()
+        if not p.running:
+            del self.processes[name]
+            return {"result": "OK", "name": name}
+        else:
+            return {
+                "result": "ERROR",
+                "reason": f"Process killed but still running",
+            }
+
+    def status(self, name):
+        if not name in self.processes:
+            return {
+                "result": "ERROR",
+                "reason": f"No process {name}",
+            }
+        p = self.processes[name]
+        return {"result": "OK", "name": name, "pid": p.pid, "is_running": p.running}
+
+    @protect
+    def processCommand(self, command, *args, **kwargs):
+        if command in self.command_dispatch:
+            resp = self.command_dispatch[command](*args, **kwargs)
+        else:
+            resp = {"result": "ERROR", "reason": f"Unknown command '{command}'"}
+        return resp
+
+    def loadServices(self, path=None):
+        if path is None:
+            path = os.environ.get("PM_CONFIG", None)
+        if path is None:
+            return
+        path = Path(path)
+        try:
+            with open(path, "r") as f:
+                d = json.load(f)
+                if not isinstance(d, dict):
+                    return
+                if not all(
+                    isinstance(x, str) and isinstance(y, str) for x, y in d.items()
+                ):
+                    return
+                self.services.update(d)
+        except OSError:
+            print(f"Failed to load services from path '{path}'")
+
+    def cleanup(self):
+        for name, process in self.processes.items():
+            if process.running:
+                process.stop()
+
+
+class ProcessManagmentHandler(BaseHTTPRequestHandler):
+    manager = None
+
+    @property
+    def url(self):
+        return urlparse(self.path)
+
+    @property
+    def query_data(self):
+        return dict(parse_qsl(self.url.query))
+
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
+        self.wfile.write((json.dumps(self.get_response()) + "\n").encode("utf-8"))
+
+    def get_response(self):
+        path = PosixPath(self.url.path)
+        parts = path.parts
+        if len(parts) < 2:
+            return {"result": "ERROR", "reason": "Must provide a command"}
+        return m.processCommand(parts[1], *parts[2:])
+
+
+def parseArgs():
+    parser = argparse.ArgumentParser(
+        prog="ProcessManager",
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "-c",
+        "--config",
+        default=os.environ.get("PM_CONFIG", None),
+        help="Path to configuration file, default to $PM_CONFIG",
+    )
+    parser.add_argument(
+        "-p",
+        "--port",
+        default=8888,
+        type=int,
+        help="Port on which to run the http server",
+    )
+    args = parser.parse_args()
+    return args
+
+
+if __name__ == "__main__":
+    m = Manager()
+    args = parseArgs()
+
+    m.loadServices(args.config)
+
+    ProcessManagmentHandler.manager = m
+
+    server = HTTPServer(("0.0.0.0", args.port), ProcessManagmentHandler)
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        m.cleanup()
