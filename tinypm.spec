@@ -12,14 +12,14 @@ BuildArch:      noarch
 License:       GPL
 Source0:       tiny_process_manager-%{version}-%{release}.tar.gz
 
-Requires:      bash python3
+Requires:      python3
 Requires(pre): /usr/sbin/useradd, /usr/bin/getent
 
 %description
 Tiny Process manager build
 
 %prep
-%setup -n tiny_process_manager-%{version}-%{release} -c
+%setup -q -n tiny_process_manager-%{version}-%{release} -c
 
 %install
 rm -rf $RPM_BUILD_ROOT
@@ -37,6 +37,6 @@ rm -rf $RPM_BUILD_ROOT
 
 %pre
 groupadd -f -r -g 889 HGCAL_pro
-getent user gpio > /dev/null 2>&1 || useradd -c HGCAL_Production_Servics -g HGCAL_pro -r HGCAL_pro
+getent user HGCAL_pro > /dev/null 2>&1 || useradd -c HGCAL_Production_Servics -g HGCAL_pro -r HGCAL_pro
 exit 0
 
