@@ -25,18 +25,27 @@ Tiny Process manager build
 rm -rf $RPM_BUILD_ROOT
 mkdir -p $RPM_BUILD_ROOT/%{_bindir}
 cp tiny_process_manager $RPM_BUILD_ROOT/%{_bindir}
-mkdir -p $RPM_BUILD_ROOT/%{_libdir}/systemd/system
-cp tiny_process_manager.service $RPM_BUILD_ROOT/%{_libdir}/systemd/system
+mkdir -p $RPM_BUILD_ROOT/%{_unitdir}
+cp tiny_process_manager.service $RPM_BUILD_ROOT/%{_unitdir}/
 
 %clean
 rm -rf $RPM_BUILD_ROOT
 
 %files
 %{_bindir}/tiny_process_manager
-%{_libdir}/systemd/system/tiny_process_manager.service
+%{_unitdir}/tiny_process_manager.service
 
 %pre
-groupadd -f -r -g 889 HGCAL_pro
-getent user HGCAL_pro > /dev/null 2>&1 || useradd -c HGCAL_Production_Servics -g HGCAL_pro -r HGCAL_pro
+getent group HGCAL_pro > /dev/null 2>&1 || groupadd -f -r -g 889 HGCAL_pro
+getent user HGCAL_pro  > /dev/null 2>&1 || useradd -c HGCAL_Production_Servics -g HGCAL_pro -r HGCAL_pro
 exit 0
+
+%post
+%systemd_post tiny_process_manager.service
+
+%preun
+%systemd_preun tiny_process_manager.service
+
+%postun
+%systemd_postun_with_restart tiny_process_manager.service
 
