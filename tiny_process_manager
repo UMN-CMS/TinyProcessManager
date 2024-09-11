@@ -167,7 +167,7 @@ class Manager:
         if path is None:
             path = os.environ.get("PM_CONFIG", None)
         if path is None:
-            return
+            path = "/etc/TinyProcessManager/commands.json"
         path = Path(path)
         try:
             with open(path, "r") as f:
