@@ -25,6 +25,19 @@ import subprocess
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path, PosixPath
 from urllib.parse import parse_qsl, urlparse
+import logging
+
+
+logger = logging.getLogger(__name__)
+
+try:
+    from systemd.journal import JournalHandler
+    logger.addHandler(JournalHandler())
+    logger.setLevel(logging.INFO)
+except ImportError:
+    pass
+
+
 
 
 class Process:
@@ -180,7 +193,7 @@ class Manager:
                     return
                 self.services.update(d)
         except OSError:
-            print(f"Failed to load services from path '{path}'")
+            logger.info(f"Failed to load services from path '{path}'")
 
     def cleanup(self):
         for name, process in self.processes.items():
