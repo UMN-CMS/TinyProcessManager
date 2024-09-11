@@ -50,8 +50,7 @@ class Process:
     def start(self):
         if self.running:
             raise RuntimeError("Cannot start already running process")
-        args = shlex.split(self.command)
-        self.process = subprocess.Popen(args)
+        self.process = subprocess.Popen(self.command, shell=True)
         self.launched = True
 
     def stop(self):
