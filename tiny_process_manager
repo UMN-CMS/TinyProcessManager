@@ -12,45 +12,50 @@ The server provides a GET interface with the following endpoints
 
 
 The services are defined in a configuration json file,
-which contains  a single json dictionary of the form:
-{"service_name" : "command to run"}
+which contains  a single json list of the form:
+[
+{name: "servicename",
+ command: "command",
+ env: {"VAR1" : VAL1}}
+]
 """
 
 
 import argparse
 import json
+import logging
 import os
 import shlex
 import subprocess
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path, PosixPath
 from urllib.parse import parse_qsl, urlparse
-import logging
-
 
 logger = logging.getLogger(__name__)
 
 try:
     from systemd.journal import JournalHandler
+
     logger.addHandler(JournalHandler())
     logger.setLevel(logging.INFO)
 except ImportError:
     pass
 
 
-
-
 class Process:
-    def __init__(self, name, command):
+    def __init__(self, name, command, env=None):
         self.name = name
         self.command = command
+        self.env = env or {}
         self.process = None
         self.launched = False
 
     def start(self):
         if self.running:
             raise RuntimeError("Cannot start already running process")
-        self.process = subprocess.Popen(self.command, shell=True)
+        new_env = os.environ.copy()
+        new_env.update(self.env)
+        self.process = subprocess.Popen(self.command, shell=True, env=self.env)
         self.launched = True
 
     def stop(self):
@@ -88,6 +93,16 @@ def protect(func):
     return inner
 
 
+class Service:
+    def __init__(self, name, command, env=None):
+        self.name = name
+        self.command = command
+        self.env = env or {}
+
+    def toDict(self):
+        return dict(name=self.name, command=self.command, env=self.env)
+
+
 class Manager:
     def __init__(self):
         self.running = False
@@ -108,8 +123,8 @@ class Manager:
                 "result": "ERROR",
                 "reason": f"Unknown service '{name}'",
             }
-        command = self.services[name]
-        p = Process(name, command)
+        service = self.services[name]
+        p = Process(service.name, service.command, service.env)
         p.start()
         if name in self.processes and self.processes[name].running:
             return {
@@ -134,7 +149,7 @@ class Manager:
         return {"result": "OK", "data": l}
 
     def list_services(self):
-        return {"result": "OK", "data": self.services}
+        return {"result": "OK", "data": [x.toDict() for x in self.services.values()]}
 
     def stop_process(self, name):
         if not name in self.processes:
@@ -175,6 +190,11 @@ class Manager:
             resp = {"result": "ERROR", "reason": f"Unknown command '{command}'"}
         return resp
 
+    def addServices(self, data):
+        for serv in data:
+            s = Service(serv["name"], serv["command"], serv.get("env", None))
+            self.services[s.name] = s
+
     def loadServices(self, path=None):
         if path is None:
             path = os.environ.get("PM_CONFIG", None)
@@ -184,13 +204,7 @@ class Manager:
         try:
             with open(path, "r") as f:
                 d = json.load(f)
-                if not isinstance(d, dict):
-                    return
-                if not all(
-                    isinstance(x, str) and isinstance(y, str) for x, y in d.items()
-                ):
-                    return
-                self.services.update(d)
+                self.addServices(d)
         except OSError:
             logger.info(f"Failed to load services from path '{path}'")
 
