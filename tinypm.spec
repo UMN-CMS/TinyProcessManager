@@ -37,7 +37,8 @@ rm -rf $RPM_BUILD_ROOT
 
 %pre
 getent group HGCAL_pro > /dev/null 2>&1 || groupadd -f -r -g 889 HGCAL_pro
-getent user HGCAL_pro  > /dev/null 2>&1 || useradd -c HGCAL_Production_Servics -g HGCAL_pro -r HGCAL_pro
+getent user HGCAL_pro  > /dev/null 2>&1 || useradd -c HGCAL_Production_Services -g HGCAL_pro -r HGCAL_pro
+mkhomedir_helper HGCAL_pro
 exit 0
 
 %post
