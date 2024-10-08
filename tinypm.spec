@@ -27,6 +27,8 @@ mkdir -p $RPM_BUILD_ROOT/%{_bindir}
 cp tiny_process_manager $RPM_BUILD_ROOT/%{_bindir}
 mkdir -p $RPM_BUILD_ROOT/%{_unitdir}
 cp tiny_process_manager.service $RPM_BUILD_ROOT/%{_unitdir}/
+mkdir -p $RPM_BUILD_ROOT/etc/sudoers.d
+mv etc/sudo_tpm $RPM_BUILD_ROOT/etc/sudoers.d/tiny_process_manager_support
 
 %clean
 rm -rf $RPM_BUILD_ROOT
@@ -34,6 +36,7 @@ rm -rf $RPM_BUILD_ROOT
 %files
 %{_bindir}/tiny_process_manager
 %{_unitdir}/tiny_process_manager.service
+%attr(640,root,root) /etc/sudoers.d/tiny_process_manager_support
 
 %pre
 getent group HGCAL_pro > /dev/null 2>&1 || groupadd -f -r -g 889 HGCAL_pro
