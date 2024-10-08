@@ -1,0 +1,2 @@
+Cmnd_Alias HGCAL_PRO_TOOLS = /usr/bin/fw-loader
+HGCAL_pro ALL = HGCAL_PRO_TOOLS
