@@ -1,2 +1,2 @@
-Cmnd_Alias HGCAL_PRO_TOOLS = /usr/bin/fw-loader
+Cmnd_Alias HGCAL_PRO_TOOLS = /usr/bin/fw-loader, /usr/bin/kconn_pwr, /bin/systemctl (start|stop|restart) kconn_gpio_server
 HGCAL_pro ALL=NOPASSWD: HGCAL_PRO_TOOLS
